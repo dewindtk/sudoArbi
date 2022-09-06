@@ -10,28 +10,6 @@ async function main(){
     //Arbinext
 }
 
-//returns cnfg.json, if there is none will be created. Last Block inspected saved in cnfg.
-async function readConfig(){ 
-    try{    
-        let cnfg = require(`./cnfg.json`);
-        return cnfg;
-    } catch (err){
-        console.log("No cnfg file found, creating fresh one");
-        cnfg = {"lastBlock": 0};
-        await fs.promises.writeFile(`./cnfg.json`, JSON.stringify(cnfg), (errr) => {
-        if (errr) {console.log(errr);}
-        });
-        return cnfg;
-    }
-}
-
-//Updates cnfg.json
-async function updateConfig(cnfg){ 
-    await fs.promises.writeFile(`./cnfg.json`, JSON.stringify(cnfg), (errr) => {
-        if (errr) {console.log(errr);}
-    });
-}
-
 //Create & update pool info 
 // think: seperat efunction to fetch events and to create pools?
 //Maybe event file which is not yet in pools data? Buffer
@@ -60,7 +38,29 @@ async function updatePools(){
     } while(events.length > 0)
 }
 
-//returns txs btw blockA and blockB, max of 10000
+//returns cnfg.json, if there is none will be created. Last Block inspected saved in cnfg.
+async function readConfig(){ 
+    try{    
+        let cnfg = require(`./cnfg.json`);
+        return cnfg;
+    } catch (err){
+        console.log("No cnfg file found, creating fresh one");
+        cnfg = {"lastBlock": 0};
+        await fs.promises.writeFile(`./cnfg.json`, JSON.stringify(cnfg), (errr) => {
+        if (errr) {console.log(errr);}
+        });
+        return cnfg;
+    }
+}
+
+//Updates cnfg.json
+async function updateConfig(cnfg){ 
+    await fs.promises.writeFile(`./cnfg.json`, JSON.stringify(cnfg), (errr) => {
+        if (errr) {console.log(errr);}
+    });
+}
+
+//returns txs of the sudo pairFactory contract btw blockA and blockB, max of 10000
 async function fetchTxsBtw(blockA, blockB){
     url = `https://api.etherscan.io/api?module=account&action=txlist&address=0xb16c1342e617a5b6e4b631eb114483fdb289c0a4&startblock=${blockA}&endblock=${blockB}&page=1&offset=10000&sort=asc&apikey=${process.env.ETHERSCANAPIKEY}`;
     response = await fetch(url);
@@ -97,7 +97,6 @@ async function fetchEventsBtw(blockA, blockB){
 
 // returns [pools, lastBlock saved] 
 async function mergeTxsEvents(txs, events){
-    //WATCH OUT: blockNumber once number once hex.
     let pools;
     try{    
         pools = require(`./pools.json`);
@@ -124,6 +123,7 @@ async function mergeTxsEvents(txs, events){
     return [pools, lastBlock];
 }
 
+//Save pools into file
 async function savePools(pools){
     await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools, null, 2), (errr) => {
         if (errr) {console.log(errr);}
