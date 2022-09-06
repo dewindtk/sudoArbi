@@ -37,9 +37,9 @@ async function updateConfig(cnfg){
 //Maybe event file which is not yet in pools data? Buffer
 async function updatePools(){
     let cnfg = await readConfig();
-    blockNow = await web3.eth.getBlockNumber();
-    events = [];
-    txs = []
+    let blockNow = await web3.eth.getBlockNumber();
+    let events = [];
+    let txs = []
 
     console.log("Updating pools.");
     console.log("Last saved Block is: ", cnfg.lastBlock);
