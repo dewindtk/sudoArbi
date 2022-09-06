@@ -1,0 +1,15 @@
+Sudoarbi:
+	
+Download all pairs and types
+save last downloaded block?
+
+	-> want to arbi collection A
+	-> fetch all pools of collection A
+	-> fetch prices 
+	-> fetch OS prices, x2y2, looksrare
+	-> if arbi opportunity arbi. voila
+
+arbi multiple collections at once.
+keep updating pool info, keep monitoring pools
+update pool infos
+
