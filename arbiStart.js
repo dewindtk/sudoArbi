@@ -49,8 +49,8 @@ async function updatePools(){
         //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event.
         
         //TODO Make fetchTxs and Events return lastBlock and compare lastBlock to BlockNow, will eliminate last call.
-        txs = await fetchTxsBtw(cnfg.lastBlock, blockNow)
-        events = await fetchEventsBtw(cnfg.lastBlock, blockNow)
+        txs = await fetchTxsBtw(cnfg.lastBlock+1, blockNow)
+        events = await fetchEventsBtw(cnfg.lastBlock+1, blockNow)
         if(events.length != 0){
             merged = await mergeTxsEvents(txs, events); 
             await savePools(merged[0]);
@@ -112,7 +112,11 @@ async function mergeTxsEvents(txs, events){
     for (var i=0;i<txs.length;i++){ //make it stop when eve not found anymore?
         eve = events.find(item => item.transactionHash.toLowerCase() === txs[i].hash.toLowerCase());
         if (eve !== undefined){
-            pools[`0x${txs[i].input.substring(34, 74)}`] = `0x${eve.data.substring(26)}`;
+            if (`0x${txs[i].input.substring(34, 74)}` in pools){
+                pools[`0x${txs[i].input.substring(34, 74)}`] = [...pools[`0x${txs[i].input.substring(34, 74)}`], `0x${eve.data.substring(26)}`];
+            } else {
+                pools[`0x${txs[i].input.substring(34, 74)}`] = [`0x${eve.data.substring(26)}`];
+            }
             lastBlock = txs[i].blockNumber
             console.log("last block: ", lastBlock)
         }
