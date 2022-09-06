@@ -7,7 +7,7 @@ async function main(){
 
     await updatePools(); // await once in case the update is big, such as the first time
     // setInterval(()=>updatePools(), 180000) //Update pool info every 3min. (make adjustable through cnfg)
-
+    //Arbinext
 }
 
 //returns cnfg.json, if there is none will be created. Last Block inspected saved in cnfg.
@@ -49,13 +49,13 @@ async function updatePools(){
         //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event.
         txs = await fetchTxsBtw(cnfg.lastBlock, 99999999)
         events = await fetchEventsBtw(cnfg.lastBlock, 99999999)
-        merged = await mergeTxsEvents(txs, events); // returns [pools, lastBlock saved] WATCH OUT: blockNumber once number once hex.
-        saveIntoPools(merged[0]);
-        cnfg.lastBlock = merged[1];
-        updateConfig(cnfg);
+        if(events.length != 0){
+            merged = await mergeTxsEvents(txs, events); 
+            saveIntoPools(merged[0]);
+            cnfg.lastBlock = merged[1];
+            updateConfig(cnfg);
+        }
     } while(events.length > 0)
-
-    //Arbi next
 }
 
 //returns txs btw blockA and blockB, max of 10000
@@ -91,6 +91,26 @@ async function fetchEventsBtw(blockA, blockB){
         });
     }
     return events;
+}
+
+// returns [pools, lastBlock saved] 
+async function mergeTxsEvents(txs, events){
+    //WATCH OUT: blockNumber once number once hex.
+    let pools;
+    try{    
+        pools = require(`./pools.json`);
+    } catch (err){
+        console.log("No pools file found, creating fresh one");
+        pools = {};
+        await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools), (errr) => {
+        if (errr) {console.log(errr);}
+        });
+    }
+    for (tx of txs){
+        //take hash and get pool address from events
+        // save into pools
+    }
+    return [pools, lastBlock];
 }
 
 // async function saveEventsIntoPools(events){
