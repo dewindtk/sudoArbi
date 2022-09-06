@@ -9,7 +9,6 @@ async function main(){
     // setInterval(()=>updatePools(), 180000) //Update pool info every 3min. (make adjustable through cnfg)
 
 }
-main()
 
 //Create & update pool info 
 // think: seperat efunction to fetch events and to create pools?
@@ -100,7 +99,7 @@ async function saveEventsIntoPools(events){
     }
 }
 
-
+main();
 
 
 //Restructure everything - not Events but events with Create Pair ETH
