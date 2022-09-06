@@ -13,3 +13,8 @@ arbi multiple collections at once.
 keep updating pool info, keep monitoring pools
 update pool infos
 
+
+fetched events from block 0 too 999 -> filter createPair events
+fetch txs from 0 to 999 -> filter createPair txs
+
+merge by tx hash. only merged saved into pool.
