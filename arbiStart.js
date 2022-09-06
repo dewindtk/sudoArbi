@@ -10,33 +10,7 @@ async function main(){
 
 }
 
-//Create & update pool info 
-// think: seperat efunction to fetch events and to create pools?
-//Maybe event file which is not yet in pools data? Buffer
-async function updatePools(){
-    let cnfg = await readConfig();
-    blockNow = await web3.eth.getBlockNumber();
-    events = [];
-
-    console.log("Updating pools.");
-    console.log("Last saved Block is: ", cnfg.lastBlock);
-    console.log("Now downloading remaining block suntil: ", blockNow);
-
-    do{ // CHECK AGAIN edges
-        shallom = await fetchEventsBtwAndLastBlockIncluded(cnfg.lastBlock, 99999999)
-        events = shallom[0];
-        console.log(events)
-        await saveEventsIntoPools(events);
-        console.log(cnfg)
-        cnfg.lastBlock = (shallom[1] == null)? cnfg.lastBlock : shallom[1];
-        updateConfig(cnfg);
-    } while(events.length > 0)
-
-    // What now ///////////////////////
-
-}
-
-//returns cnfg.json, if there is none will be created.
+//returns cnfg.json, if there is none will be created. Last Block inspected saved in cnfg.
 async function readConfig(){ 
     try{    
         let cnfg = require(`./cnfg.json`);
@@ -58,26 +32,67 @@ async function updateConfig(cnfg){
     });
 }
 
+//Create & update pool info 
+// think: seperat efunction to fetch events and to create pools?
+//Maybe event file which is not yet in pools data? Buffer
+async function updatePools(){
+    let cnfg = await readConfig();
+    blockNow = await web3.eth.getBlockNumber();
+    events = [];
+    txs = []
+
+    console.log("Updating pools.");
+    console.log("Last saved Block is: ", cnfg.lastBlock);
+    console.log("Now downloading remaining blocks until: ", blockNow);
+
+    do{ //Fetch events, fetch txs, rename, merge, save into pools those merged.
+        txs = await fetchTxsBtw(cnfg.lastBlock, 99999999)
+        events = await fetchEventsBtw(cnfg.lastBlock, 99999999)
+        merged = await mergeTxsEvents(txs, events); // returns [pools, lastBlock saved] WATCH OUT: blockNumber once number once hex.
+        savePools(merged[0]);
+        cnfg.lastBlock = merged[1];
+        updateConfig(cnfg);
+    } while(events.length > 0)
+
+    //Arbi next
+
+}
+
+
 //returns [array of Event Objects, lastBlock tosave]
 //Fetches events of NewPair btw Block A and B, maximum of 10000 Events.  
 //Returns last block included null if no Events fetched.
-async function fetchEventsBtwAndLastBlockIncluded(blockA, blockB){
+async function fetchTxsBtw(blockA, blockB){
     url = `https://api.etherscan.io/api?module=account&action=txlist&address=0xb16c1342e617a5b6e4b631eb114483fdb289c0a4&startblock=${blockA}&endblock=${blockB}&page=1&offset=10&sort=asc&apikey=${process.env.ETHERSCANAPIKEY}`;
     response = await fetch(url);
     resJson = await response.json();
-    events = resJson.result;
-    events.filter(function(obj){
+    txs = resJson.result;
+    txs.filter(function(obj){
         return obj.methodId === "0xce9c095d"
     });
+    lastBlock = (txs.length>0)? txs.at(-1).blockNumber : null;
+    //Duplication avoidance.
+    if(txs.length > 9700){
+            txs = txs.filter(function( obj ) { // Possiblle efficiency improvement: search only couple last ones backwards until change.
+            return obj.blockNumber !== lastBlock;  
+        });
+    }
+    return txs;
+}
+
+async function fetchEventsBtw(blockA, blockB){
+    url = `https://api.etherscan.io/api?module=logs&action=getLogs&fromBlock=${blockA}&toBlock=${blockB}&topic0=0xf5bdc103c3e68a20d5f97d2d46792d3fdddfa4efeb6761f8141e6a7b936ca66c&page=1&offset=10000&apikey=${process.env.ETHERSCANAPIKEY}`;
+    response = await fetch(url);
+    resJson = await response.json();
+    events = resJson.result;
     lastBlock = (events.length>0)? events.at(-1).blockNumber : null;
     //Duplication avoidance.
     if(events.length > 9700){
             events = events.filter(function( obj ) { // Possiblle efficiency improvement: search only couple last ones backwards until change.
             return obj.blockNumber !== lastBlock;  
         });
-        lastBlock = events.at(-1).blockNumber;
     }
-    return [events, lastBlock]
+    return events;
 }
 
 async function saveEventsIntoPools(events){
