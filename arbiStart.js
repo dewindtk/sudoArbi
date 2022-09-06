@@ -47,20 +47,22 @@ async function updatePools(){
 
     do{ //Fetch events, fetch txs, rename, merge, save into pools those merged.
         //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event.
-        txs = await fetchTxsBtw(cnfg.lastBlock, 99999999)
-        events = await fetchEventsBtw(cnfg.lastBlock, 99999999)
+        
+        //TODO Make fetchTxs and Events return lastBlock and compare lastBlock to BlockNow, will eliminate last call.
+        txs = await fetchTxsBtw(cnfg.lastBlock, blockNow)
+        events = await fetchEventsBtw(cnfg.lastBlock, blockNow)
         if(events.length != 0){
             merged = await mergeTxsEvents(txs, events); 
-            saveIntoPools(merged[0]);
-            cnfg.lastBlock = merged[1];
-            updateConfig(cnfg);
+            await savePools(merged[0]);
+            cnfg.lastBlock = (merged[1]!=null)? merged[1]: cnfg.lastBlock;
+            await updateConfig(cnfg);
         }
     } while(events.length > 0)
 }
 
 //returns txs btw blockA and blockB, max of 10000
 async function fetchTxsBtw(blockA, blockB){
-    url = `https://api.etherscan.io/api?module=account&action=txlist&address=0xb16c1342e617a5b6e4b631eb114483fdb289c0a4&startblock=${blockA}&endblock=${blockB}&page=1&offset=10&sort=asc&apikey=${process.env.ETHERSCANAPIKEY}`;
+    url = `https://api.etherscan.io/api?module=account&action=txlist&address=0xb16c1342e617a5b6e4b631eb114483fdb289c0a4&startblock=${blockA}&endblock=${blockB}&page=1&offset=10000&sort=asc&apikey=${process.env.ETHERSCANAPIKEY}`;
     response = await fetch(url);
     resJson = await response.json();
     txs = resJson.result;
@@ -106,31 +108,23 @@ async function mergeTxsEvents(txs, events){
         if (errr) {console.log(errr);}
         });
     }
-    for (tx of txs){
-        //take hash and get pool address from events
-        // save into pools
+    let lastBlock = null
+    for (var i=0;i<txs.length;i++){ //make it stop when eve not found anymore?
+        eve = events.find(item => item.transactionHash.toLowerCase() === txs[i].hash.toLowerCase());
+        if (eve !== undefined){
+            pools[`0x${txs[i].input.substring(34, 74)}`] = `0x${eve.data.substring(26)}`;
+            lastBlock = txs[i].blockNumber
+            console.log("last block: ", lastBlock)
+        }
     }
     return [pools, lastBlock];
 }
 
-// async function saveEventsIntoPools(events){
-//     //check if pools file existing, if not create format {nft: [pool1, pool2]}
-//     let pools;
-//     try{    
-//         pools = require(`./pools.json`);
-//     } catch (err){
-//         console.log("No pools file found, creating fresh one");
-//         pools = {};
-//         await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools), (errr) => {
-//         if (errr) {console.log(errr);}
-//         });
-//     }
-//     for (eve of events){
-//         //Get contract address from input
-//         pools[`0x${eve.input.substring(34, 74)}`] = "ff"
-//         console.log(pools)
-//     }
-// }
+async function savePools(pools){
+    await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools, null, 2), (errr) => {
+        if (errr) {console.log(errr);}
+    });
+}
 
 main();
 
