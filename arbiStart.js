@@ -83,9 +83,9 @@ async function fetchEventsBtw(blockA, blockB){
     response = await fetch(url);
     resJson = await response.json();
     events = resJson.result;
-    lastBlock = (events.length>0)? events.at(-1).blockNumber : null;
     //Duplication avoidance.
     if(events.length > 9700){
+            lastBlock = events.at(-1).blockNumber;
             events = events.filter(function( obj ) { // Possiblle efficiency improvement: search only couple last ones backwards until change.
             return obj.blockNumber !== lastBlock;  
         });
