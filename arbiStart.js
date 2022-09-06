@@ -46,6 +46,7 @@ async function updatePools(){
     console.log("Now downloading remaining blocks until: ", blockNow);
 
     do{ //Fetch events, fetch txs, rename, merge, save into pools those merged.
+        //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event.
         txs = await fetchTxsBtw(cnfg.lastBlock, 99999999)
         events = await fetchEventsBtw(cnfg.lastBlock, 99999999)
         merged = await mergeTxsEvents(txs, events); // returns [pools, lastBlock saved] WATCH OUT: blockNumber once number once hex.
@@ -55,9 +56,7 @@ async function updatePools(){
     } while(events.length > 0)
 
     //Arbi next
-
 }
-
 
 //returns [array of Event Objects, lastBlock tosave]
 //Fetches events of NewPair btw Block A and B, maximum of 10000 Events.  
