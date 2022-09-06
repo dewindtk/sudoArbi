@@ -3,6 +3,14 @@ const Web3 = require(`web3`)
 require("dotenv").config();
 const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 
+async function main(){
+
+    await updatePools(); // await once in case the update is big, such as the first time
+    // setInterval(()=>updatePools(), 180000) //Update pool info every 3min. (make adjustable through cnfg)
+
+}
+main()
+
 //Create & update pool info 
 // think: seperat efunction to fetch events and to create pools?
 //Maybe event file which is not yet in pools data? Buffer
@@ -92,13 +100,7 @@ async function saveEventsIntoPools(events){
     }
 }
 
-async function main(){
 
-    await updatePools(); // await once in case the update is big, such as the first time
-    // setInterval(()=>updatePools(), 180000) //Update pool info every 3min. (make adjustable through cnfg)
-
-}
-main()
 
 
 //Restructure everything - not Events but events with Create Pair ETH
