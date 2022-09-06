@@ -58,9 +58,7 @@ async function updatePools(){
     //Arbi next
 }
 
-//returns [array of Event Objects, lastBlock tosave]
-//Fetches events of NewPair btw Block A and B, maximum of 10000 Events.  
-//Returns last block included null if no Events fetched.
+//returns txs btw blockA and blockB, max of 10000
 async function fetchTxsBtw(blockA, blockB){
     url = `https://api.etherscan.io/api?module=account&action=txlist&address=0xb16c1342e617a5b6e4b631eb114483fdb289c0a4&startblock=${blockA}&endblock=${blockB}&page=1&offset=10&sort=asc&apikey=${process.env.ETHERSCANAPIKEY}`;
     response = await fetch(url);
@@ -69,9 +67,9 @@ async function fetchTxsBtw(blockA, blockB){
     txs.filter(function(obj){
         return obj.methodId === "0xce9c095d"
     });
-    lastBlock = (txs.length>0)? txs.at(-1).blockNumber : null;
     //Duplication avoidance.
     if(txs.length > 9700){
+            lastBlock = txs.at(-1).blockNumber;
             txs = txs.filter(function( obj ) { // Possiblle efficiency improvement: search only couple last ones backwards until change.
             return obj.blockNumber !== lastBlock;  
         });
@@ -79,6 +77,7 @@ async function fetchTxsBtw(blockA, blockB){
     return txs;
 }
 
+//returns events of createPair btw blockA and blockB, max of 10000
 async function fetchEventsBtw(blockA, blockB){
     url = `https://api.etherscan.io/api?module=logs&action=getLogs&fromBlock=${blockA}&toBlock=${blockB}&topic0=0xf5bdc103c3e68a20d5f97d2d46792d3fdddfa4efeb6761f8141e6a7b936ca66c&page=1&offset=10000&apikey=${process.env.ETHERSCANAPIKEY}`;
     response = await fetch(url);
