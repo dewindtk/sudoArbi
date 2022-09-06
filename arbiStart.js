@@ -50,7 +50,7 @@ async function updatePools(){
         txs = await fetchTxsBtw(cnfg.lastBlock, 99999999)
         events = await fetchEventsBtw(cnfg.lastBlock, 99999999)
         merged = await mergeTxsEvents(txs, events); // returns [pools, lastBlock saved] WATCH OUT: blockNumber once number once hex.
-        savePools(merged[0]);
+        saveIntoPools(merged[0]);
         cnfg.lastBlock = merged[1];
         updateConfig(cnfg);
     } while(events.length > 0)
@@ -93,27 +93,25 @@ async function fetchEventsBtw(blockA, blockB){
     return events;
 }
 
-async function saveEventsIntoPools(events){
-    //check if pools file existing, if not create format {nft: [pool1, pool2]}
-    let pools;
-    try{    
-        pools = require(`./pools.json`);
-    } catch (err){
-        console.log("No pools file found, creating fresh one");
-        pools = {};
-        await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools), (errr) => {
-        if (errr) {console.log(errr);}
-        });
-    }
-    for (eve of events){
-        //Get contract address from input
-        pools[`0x${eve.input.substring(34, 74)}`] = "ff"
-        console.log(pools)
-    }
-}
+// async function saveEventsIntoPools(events){
+//     //check if pools file existing, if not create format {nft: [pool1, pool2]}
+//     let pools;
+//     try{    
+//         pools = require(`./pools.json`);
+//     } catch (err){
+//         console.log("No pools file found, creating fresh one");
+//         pools = {};
+//         await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools), (errr) => {
+//         if (errr) {console.log(errr);}
+//         });
+//     }
+//     for (eve of events){
+//         //Get contract address from input
+//         pools[`0x${eve.input.substring(34, 74)}`] = "ff"
+//         console.log(pools)
+//     }
+// }
 
 main();
 
-
-//Restructure everything - not Events but events with Create Pair ETH
 
