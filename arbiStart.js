@@ -6,7 +6,7 @@ const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEM
 async function main(){
 
     await updatePools(); // await once in case the update is big, such as the first time
-    // setInterval(()=>updatePools(), 180000) //Update pool info every 3min. (make adjustable through cnfg)
+    setInterval(()=>updatePools(), 60000) //Update pool info every min. (make adjustable through cnfg)
     //Arbinext
 }
 
@@ -49,8 +49,8 @@ async function updatePools(){
         //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event.
         
         //TODO Make fetchTxs and Events return lastBlock and compare lastBlock to BlockNow, will eliminate last call.
-        txs = await fetchTxsBtw(cnfg.lastBlock+1, blockNow)
-        events = await fetchEventsBtw(cnfg.lastBlock+1, blockNow)
+        txs = await fetchTxsBtw(parseInt(cnfg.lastBlock)+1, blockNow)
+        events = await fetchEventsBtw(parseInt(cnfg.lastBlock)+1, blockNow)
         if(events.length != 0){
             merged = await mergeTxsEvents(txs, events); 
             await savePools(merged[0]);
@@ -85,6 +85,7 @@ async function fetchEventsBtw(blockA, blockB){
     response = await fetch(url);
     resJson = await response.json();
     events = resJson.result;
+    console.log(blockA, blockB, events)
     //Duplication avoidance.
     if(events.length > 9700){
             lastBlock = events.at(-1).blockNumber;
@@ -118,7 +119,7 @@ async function mergeTxsEvents(txs, events){
                 pools[`0x${txs[i].input.substring(34, 74)}`] = [`0x${eve.data.substring(26)}`];
             }
             lastBlock = txs[i].blockNumber
-            console.log("last block: ", lastBlock)
+            console.log("last pool added: 0x", eve.data.substring(26))
         }
     }
     return [pools, lastBlock];
