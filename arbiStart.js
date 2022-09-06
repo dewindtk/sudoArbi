@@ -43,7 +43,7 @@ async function updatePools(){
 
     console.log("Updating pools.");
     console.log("Last saved Block is: ", cnfg.lastBlock);
-    console.log("Now downloading remaining blocks until: ", blockNow);
+    console.log("Now downloading remaining blocks (if any) until: ", blockNow);
 
     do{ //Fetch events, fetch txs, rename, merge, save into pools those merged.
         //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event.
@@ -85,7 +85,6 @@ async function fetchEventsBtw(blockA, blockB){
     response = await fetch(url);
     resJson = await response.json();
     events = resJson.result;
-    console.log(blockA, blockB, events)
     //Duplication avoidance.
     if(events.length > 9700){
             lastBlock = events.at(-1).blockNumber;
