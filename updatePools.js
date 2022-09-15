@@ -66,7 +66,7 @@ async function fetchTxsBtw(blockA, blockB){
     response = await fetch(url);
     resJson = await response.json();
     txs = resJson.result;
-    txs.filter(function(obj){
+    txs = txs.filter(function(obj){
         return obj.methodId === "0xce9c095d"
     });
     //Duplication avoidance.
