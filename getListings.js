@@ -33,7 +33,6 @@ async function getOsListings(contract, delta){
             result[obj.asset.token_id] = [{"market": "OS", "price": iprice, "expiration": iexp,"object": obj}]
         }
     }
-    console.log(result)
     return result
 }
 
@@ -101,19 +100,7 @@ async function getPoolSellQuote(pairContract){
     return [pairContract, balance, outputAmount, newSpotPrice, newBalance]
 }
 
-//Filters out inactive pools (maybe save in seperate monitor array)
-function updatePools(){
-
-}
-
-//Add multiple collection support tho this outside current functions
-async function main(){
-
-    let listings = {}
-    let osListings = await getOsListings("0xed5af388653567af2f388e6224dc7c4b3241c544", 3600)
-    listings = addToListings(listings, [osListings])
-    console.log("final: ", listings)
-    //loop this shit
+async function getPoolsQuotes(){
     let pools = require('./pools.json') //error handling
     let myPools = []
     try{
@@ -128,9 +115,34 @@ async function main(){
         prmses.push(getPoolSellQuote(pool))
     }
     result = await Promise.allSettled(prmses)
-    console.log(result)
+    result = result.map(function(obj){
+        return obj.value //[addy, balance, outputAmount, newSpotPrice, newBalance]
+    })
+    return filterEmptyPools(result)
+}
+
+//Filters out inactive pools (maybe save in seperate monitor array)
+//Input: [[addy, balance, outputAmount, newSpotPrice, newBalance]]
+function filterEmptyPools(pools){
+    pools = pools.filter(obj => obj[4]>0) //Adjust maybe slighly below 0?
+    return pools
+}
+
+//Add multiple collection support tho this outside current functions
+async function main(){
+
+    let listings = {}
+    let osListings = await getOsListings("0xed5af388653567af2f388e6224dc7c4b3241c544", 3600)
+    listings = addToListings(listings, [osListings])
+    console.log("final: ", listings)
+    //loop this upadte
+
+    pools = await getPoolsQuotes("0xed5af388653567af2f388e6224dc7c4b3241c544")
+    console.log(pools)
 
     //Loop updateListings
 }
 main();
+
+//TODO draw plan of action into same steps for both pools and listings for better org
 
