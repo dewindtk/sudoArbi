@@ -101,13 +101,18 @@ async function getPoolSellQuote(pairContract){
     return [pairContract, balance, outputAmount, newSpotPrice, newBalance]
 }
 
+//Filters out inactive pools (maybe save in seperate monitor array)
+function updatePools(){
+
+}
+
 //Add multiple collection support tho this outside current functions
 async function main(){
-    // let listings = {}
-    // let osListings = await getOsListings("0xed5af388653567af2f388e6224dc7c4b3241c544", 3600)
-    // listings = addToListings(listings, [osListings])
-    // console.log("final: ", listings)
 
+    let listings = {}
+    let osListings = await getOsListings("0xed5af388653567af2f388e6224dc7c4b3241c544", 3600)
+    listings = addToListings(listings, [osListings])
+    console.log("final: ", listings)
     //loop this shit
     let pools = require('./pools.json') //error handling
     let myPools = []
