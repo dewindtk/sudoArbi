@@ -25,7 +25,7 @@ async function getOsListings(contract, delta){
 
     result = {}
     for (obj of listings){
-        iprice = new web3.utils.BN(obj.starting_price)
+        iprice = parseFloat(web3.utils.fromWei(obj.starting_price))
         iexp = Math.round(new Date(`${obj.listing_time}z`).valueOf()/1000 + parseInt(obj.duration))
         try{
             result[obj.asset.token_id].push({"market": "OS", "price": iprice, "expiration": iexp, "object": obj})
@@ -84,16 +84,16 @@ async function getPoolSellQuote(pairContract){
     const result = await contract.getSellNFTQuote(1); //error, newSpotPrice, newDelta, outputAmount, protocolFee
 
     let balance = await web3.eth.getBalance(pairContract)
-    balance = await web3.utils.fromWei(balance)
+    balance = web3.utils.fromWei(balance)
     balance = parseFloat(balance)
 
-    let outputAmount = await web3.utils.fromWei(result[3].toString())
+    let outputAmount = web3.utils.fromWei(result[3].toString())
     outputAmount = parseFloat(outputAmount)
 
-    let newSpotPrice = await  web3.utils.fromWei(result[1].toString())
+    let newSpotPrice = web3.utils.fromWei(result[1].toString())
     newSpotPrice = parseFloat(newSpotPrice)
 
-    let fee = await web3.utils.fromWei(result[4].toString())
+    let fee = web3.utils.fromWei(result[4].toString())
     fee = parseFloat(fee)
 
     let newBalance = balance - outputAmount - fee
@@ -118,21 +118,21 @@ async function getPoolsQuotes(){
     result = result.map(function(obj){
         return obj.value //[addy, balance, outputAmount, newSpotPrice, newBalance]
     })
-    return filterEmptyPools(result)
+    return filterEmptyPoolsSort(result)
 }
 
-//Filters out inactive pools (maybe save in seperate monitor array)
+//Filters out inactive pools (maybe save in seperate monitor array) and then sort by profitability
 //Input: [[addy, balance, outputAmount, newSpotPrice, newBalance]]
-function filterEmptyPools(pools){
+function filterEmptyPoolsSort(pools){
     pools = pools.filter(obj => obj[4]>0) //Adjust maybe slighly below 0?
-    return pools
+    return pools.sort((a,b) => -(a[2]-b[2]))
 }
 
 //Add multiple collection support tho this outside current functions
 async function main(){
 
     let listings = {}
-    let osListings = await getOsListings("0xed5af388653567af2f388e6224dc7c4b3241c544", 3600)
+    let osListings = await getOsListings("0xed5af388653567af2f388e6224dc7c4b3241c544", 36000)
     listings = addToListings(listings, [osListings])
     console.log("final: ", listings)
     //loop this upadte
@@ -142,7 +142,14 @@ async function main(){
 
     //Loop updateListings
 }
-main();
+// main();
 
 //TODO draw plan of action into same steps for both pools and listings for better org
+//TODO make arrays disctionaries for organization
 
+
+module.exports = {
+    getOsListings,
+    addToListings,
+    getPoolsQuotes,
+}

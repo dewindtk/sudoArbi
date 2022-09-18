@@ -3,13 +3,6 @@ const Web3 = require(`web3`)
 require("dotenv").config();
 const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 
-async function main(){
-
-    await updatePools(); // await once in case the update is big, such as the first time
-    setInterval(()=>updatePools(), 60000) //Update pool info every min. (make adjustable through cnfg)
-    //Arbinext
-}
-
 //Create & update pool info 
 // think: seperat efunction to fetch events and to create pools?
 //Maybe event file which is not yet in pools data? Buffer
@@ -130,10 +123,16 @@ async function savePools(pools){
     });
 }
 
-main();
+async function main(){ //example
+    await updatePools(); // await once in case the update is big, such as the first time
+    setInterval(()=>updatePools(), 60000) //Update pool info every min. (make adjustable through cnfg)
+    //Arbinext
+}
 
-module.exorts = {
-    updatePools
+// main();
+
+module.exports = {
+    updatePools,
 }
 
 
