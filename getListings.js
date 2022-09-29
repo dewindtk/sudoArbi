@@ -10,10 +10,10 @@ const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.
 //Only normal listings for now
 //Checks payment_token.address == 0x, price devided by payment_token.decimals, is_private == false
 //returns {"token_id": [{market, price, expiration timestamp, listingObject}]} price is in BN
-async function getOsListings(contract, delta){
+async function getOsEvents(contract, delta){
     const options = {
         method: 'GET',
-        headers: {accept: 'application/json', 'X-API-KEY': 'cc1343daeb6b494fa7d51a6c9badf767'}
+        headers: {accept: 'application/json', 'X-API-KEY': process.env.OPENSEA_API_KEY}
     };
     responce = await fetch(`https://api.opensea.io/api/v1/events?asset_contract_address=${contract}&event_type=created&occurred_after=${Math.floor(Date.now()/1000)-delta}`, options)
     responce = await responce.json();
@@ -76,6 +76,18 @@ function updateListings(listings){
     return listings
 }
 
+async function getOSTokenIdSellQuote(contract, tokenId){
+    const options = {
+        method: 'GET',
+        headers: {accept: 'application/json', 'X-API-KEY': process.env.OPENSEA_API_KEY}
+      };
+      
+    responce = await fetch(`https://api.opensea.io/v2/orders/ethereum/seaport/listings?asset_contract_address=${contract}&token_ids=${tokenId}&order_by=created_date`, options)
+    responce = await responce.json()
+    responce.orders = responce.orders.sort((a,b) => (a.current_price - b.current_price))
+    return responce;
+}
+
 // Too many web3 Calls. Slow. TODO make utils calculations yourself.
 // returns addy, balance, outputAmount, newSpotPrice, newBalance
 async function getPoolSellQuote(pairContract){
@@ -87,7 +99,7 @@ async function getPoolSellQuote(pairContract){
     balance = web3.utils.fromWei(balance)
     balance = parseFloat(balance)
 
-    let outputAmount = web3.utils.fromWei(result[3].toString())
+    let outputAmount = web3.utils.fromWei(result[3].toString())   //ERROR HANDLING IN EVERY FETCH?
     outputAmount = parseFloat(outputAmount)
 
     let newSpotPrice = web3.utils.fromWei(result[1].toString())
@@ -101,47 +113,57 @@ async function getPoolSellQuote(pairContract){
 }
 
 async function getPoolsQuotes(){
-    let pools = require('./pools.json') //error handling
+    const pools = require('./pools.json') //error handling
     let myPools = []
     try{
         myPools = pools["0xed5af388653567af2f388e6224dc7c4b3241c544"]
     }
     catch(err){
         console.log("No pools for this contract");
-        return
+        return []
     }
     let prmses = []
     for (const pool of myPools){
         prmses.push(getPoolSellQuote(pool))
     }
     result = await Promise.allSettled(prmses)
-    result = result.map(function(obj){
-        return obj.value //[addy, balance, outputAmount, newSpotPrice, newBalance]
+    result2 = result.map(function(obj){
+        // let temp = []
+        // if (!('value' in obj)){
+        //     do{
+        //         temp = await getPoolSellQuote(myPools[result.indexOf(obj)]) //DOES NOT WORK
+        //     } while(!('value' in temp))
+        // }
+        // console.log("value: ", obj.value)
+        return obj.value
     })
-    return filterEmptyPoolsSort(result)
+
+    return filterEmptyPoolsSort(result2)
 }
 
 //Filters out inactive pools (maybe save in seperate monitor array) and then sort by profitability
 //Input: [[addy, balance, outputAmount, newSpotPrice, newBalance]]
 function filterEmptyPoolsSort(pools){
-    pools = pools.filter(obj => obj[4]>0) //Adjust maybe slighly below 0?
-    return pools.sort((a,b) => -(a[2]-b[2]))
+    pools = pools.filter(obj => (typeof obj)!=='undefined')
+    pools = pools.filter(obj => obj[4]>0)//Think of proper error handling of UNDEFINED ASK KFISH
+    //Adjust maybe slighly below 0?
+    return pools
 }
 
 //Add multiple collection support tho this outside current functions
-async function main(){
+// async function main(){
 
-    let listings = {}
-    let osListings = await getOsListings("0xed5af388653567af2f388e6224dc7c4b3241c544", 36000)
-    listings = addToListings(listings, [osListings])
-    console.log("final: ", listings)
-    //loop this upadte
+//     let listings = {}
+//     let osListings = await getOsEvents("0xed5af388653567af2f388e6224dc7c4b3241c544", 36000)
+//     listings = addToListings(listings, [osListings])
+//     console.log("final: ", listings)
+//     //loop this upadte
 
-    pools = await getPoolsQuotes("0xed5af388653567af2f388e6224dc7c4b3241c544")
-    console.log(pools)
+//     pools = await getPoolsQuotes("0xed5af388653567af2f388e6224dc7c4b3241c544")
+//     console.log(pools)
 
-    //Loop updateListings
-}
+//     //Loop updateListings
+// }
 // main();
 
 //TODO draw plan of action into same steps for both pools and listings for better org
@@ -149,7 +171,8 @@ async function main(){
 
 
 module.exports = {
-    getOsListings,
+    getOsEvents,
     addToListings,
     getPoolsQuotes,
+    getOSTokenIdSellQuote,
 }
