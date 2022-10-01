@@ -9,7 +9,9 @@ const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.
 
 //Only normal listings for now
 //Checks payment_token.address == 0x, price devided by payment_token.decimals, is_private == false
-//returns {"token_id": [{market, price, expiration timestamp, listingObject}]} price is in BN
+//BEFORE: returns {"token_id": [{market, price, expiration timestamp, listingObject}]}
+
+//NOW: returns [{token_id, market, price, expiration, listing_object}]
 async function getOsEvents(contract, delta){
     const options = {
         method: 'GET',
@@ -23,57 +25,20 @@ async function getOsEvents(contract, delta){
     });
     // console.log(listings) //[{asset: {token_id: 1234}}]
 
-    result = {}
+    result = []
     for (obj of listings){
         iprice = parseFloat(web3.utils.fromWei(obj.starting_price))
         iexp = Math.round(new Date(`${obj.listing_time}z`).valueOf()/1000 + parseInt(obj.duration))
-        try{
-            result[obj.asset.token_id].push({"market": "OS", "price": iprice, "expiration": iexp, "object": obj})
-        }catch(err){
-            result[obj.asset.token_id] = [{"market": "OS", "price": iprice, "expiration": iexp,"object": obj}]
-        }
+        result.push({"token_id": obj.asset.token_id, "market": "OS", "price": iprice, "expiration": iexp,"object": obj})
     }
     return result
 }
 
-//Input: listings = {tokenid: [{market, price, obj}]}
-//osLrXy an array of listing arrays.
-function addToListings(listings, osLrXy){
-    if(osLrXy.length!=1){
-        for(const markt of osLrXy){
-            listings = addToListings(listings, markt)
-        }
-        return listings
-    }
-
-    toAdd = osLrXy[0]
-    for(const [key, value] of Object.entries(toAdd)){ //CAREFUL value here is an array of customListing obj
-        for (customList of value){
-            try{
-                listings[key].push(customList)
-            }catch(err){
-                listings[key] = [customList]
-            }
-        }
-
-    }
-    listings = updateListings(listings)
-    return listings
-}
-
-//pls test
+//Removes inactive listings
 function updateListings(listings){
     dateNow = Math.round(new Date(new Date().toISOString()).valueOf()/1000)
     console.log("datenow: ", dateNow)
-    for(const [token_id, lists] of Object.entries(listings)){
-        listings[token_id] = lists.filter(function(obj){ //Only public listings and payments with ETH
-            return obj.expiration > dateNow
-        });
-        if (listings[token_id].length == 0){
-            delete listings[token_id]
-        }
-    }
-    return listings
+    return listings.filter(obj => obj.expiration > dateNow)
 }
 
 async function getOSTokenIdSellQuote(contract, tokenId){
@@ -109,7 +74,7 @@ async function getPoolSellQuote(pairContract){
     fee = parseFloat(fee)
 
     let newBalance = balance - outputAmount - fee
-    return [pairContract, balance, outputAmount, newSpotPrice, newBalance]
+    return {"pairContract": pairContract, "balance": balance, "outputAmount": outputAmount, "newSpotPrice": newSpotPrice, "newBalance": newBalance}
 }
 
 async function getPoolsQuotes(){
@@ -128,24 +93,17 @@ async function getPoolsQuotes(){
     }
     result = await Promise.allSettled(prmses)
     result2 = result.map(function(obj){
-        // let temp = []
-        // if (!('value' in obj)){
-        //     do{
-        //         temp = await getPoolSellQuote(myPools[result.indexOf(obj)]) //DOES NOT WORK
-        //     } while(!('value' in temp))
-        // }
-        // console.log("value: ", obj.value)
         return obj.value
     })
 
-    return filterEmptyPoolsSort(result2)
+    return filterEmptyPoolsSort(result2) //[{},{},{}]
 }
 
 //Filters out inactive pools (maybe save in seperate monitor array) and then sort by profitability
-//Input: [[addy, balance, outputAmount, newSpotPrice, newBalance]]
+//Input: [{addy, balance, outputAmount, newSpotPrice, newBalance}]
 function filterEmptyPoolsSort(pools){
     pools = pools.filter(obj => (typeof obj)!=='undefined')
-    pools = pools.filter(obj => obj[4]>0)//Think of proper error handling of UNDEFINED ASK KFISH
+    pools = pools.filter(obj => obj.newBalance > 0)//Think of proper error handling of UNDEFINED ASK KFISH
     //Adjust maybe slighly below 0?
     return pools
 }
@@ -172,7 +130,7 @@ function filterEmptyPoolsSort(pools){
 
 module.exports = {
     getOsEvents,
-    addToListings,
+    updateListings,
     getPoolsQuotes,
     getOSTokenIdSellQuote,
 }

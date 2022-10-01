@@ -112,12 +112,18 @@ function createSudoTxData(inputData){//require Object {minExpectedOutputAmount, 
     return txData
 }
 
-function findProfitableListing(listings, pools){
-    pools = pools.sort((a,b) => -(a[2]-b[2]))
-    listings = listings.sort()
+//returns [listed tokenID, pool addy] if found, else null
+async function findProfitableListing(listings, pools){
+    pools = pools.sort((a,b) => -(a.outputAmount-b.outputAmount))
+    listings = listings.sort((a,b) => (a.price-b.price))
+    if (pools[0].outputAmount > listings[0].price){
+        const osSellQuote = await GET.getOSTokenIdSellQuote(listings[0].object.asset.asset_contract.address, listings[0].token_id)
+        return [osSellQuote, pools[0]] //return OsSellquote here, keep in mind multiple listings, orders[0]
+    }
+    return null
 }
 
-async function createFBBundle(marketplace='OS',poolAddy, osTxData, sudoTxData, parameters){
+async function createFBBundle(osTxData, parameters, poolAddy, sudoTxData, marketplace='OS'){
     const authSigner = new ethers.Wallet(`${process.env.FB_AUTH_KEY}`);
     const wallet3 = new ethers.Wallet(`${process.env.WALLET_PRIV_KEY}`)
     const nonce3 = web3.eth.getTransactionCount(wallet3.address)
@@ -162,6 +168,9 @@ async function createFBBundle(marketplace='OS',poolAddy, osTxData, sudoTxData, p
         'nonce': nonce3 + 1,
     }
 
+    console.log("buy FB tx: ", tx_buy_from_marketplace)
+    console.log("sell FB tx: ", tx_sell_to_sudoPool)
+
     const signedBundle = await flashbotsProvider.signBundle(
     [
         {
@@ -173,12 +182,16 @@ async function createFBBundle(marketplace='OS',poolAddy, osTxData, sudoTxData, p
             transaction: tx_sell_to_sudoPool,
         },
     ]);
-    
+
+    return signedBundle
+}
+ 
+async function sendFBBundle(signedBundle){
     const bundleReceipt = await flashbotsProvider.sendRawBundle(
         signedBundle,
         TARGET_BLOCK_NUMBER
     );
-
+    return bundleReceipt
 }
 
 
@@ -188,23 +201,35 @@ async function main(){
     await MEM.updatePools(); // await once in case the update is big, such as the first time
     // setInterval(()=>MEM.updatePools(), 180000) //Update pool info every min. (make adjustable through cnfg)
 
-    let listings = {}
-    let osListings = await GET.getOsEvents("0xed5af388653567af2f388e6224dc7c4b3241c544", 36000)
-    listings = GET.addToListings(listings, [osListings])
-    console.log(listings)
+    let listings = []
+    let osListings = await GET.getOsEvents("0xed5af388653567af2f388e6224dc7c4b3241c544", 72000)
+    listings = listings.concat(osListings)
+    listings = GET.updateListings(listings)
+    console.log("listing Events: ", listings) //[{token_id, market, price, expiration, listing_object},{},{}]
     //loop this upadte
 
-    pools = await GET.getPoolsQuotes("0xed5af388653567af2f388e6224dc7c4b3241c544")
-    // console.log("final pools: ", pools)
+    pools = await GET.getPoolsQuotes("0xed5af388653567af2f388e6224dc7c4b3241c544") //[{addy, balance, outputAmount, newSpotPrice, newBalance},{},{}]
+    console.log("final pools: ", pools)
 
-    arbi = findProfitableListing(listings, pools); //TODO //returns WListing, WPool
+    arbi = await findProfitableListing(listings, pools); //TODO //returns WListing, WPool
 
-    const listingA = await GET.getOSTokenIdSellQuote("0xedf6d3c3664606fe9ee3a9796d5cc75e3b16e682", 4165)
-    await fs.promises.writeFile(`./listingA.json`, JSON.stringify(listingA, null, 2), (errr) => {
-        if (errr) {console.log(errr);}
-    });
-    const A = require('./listingA.json')
-    console.log(createOSTxData(A))
+    if (arbi !== null){
+        const osTxData = createOSTxData()
+        const sudoTxData = createSudoTxData()
+        const signedBundle = await createFBBundle(osTxData, arbi[0], sudoTxData, arbi[1])
+        // const txReceipt = await sendFBBundle(signedBundle)
+        console.log(txReceipt)
+    }
+    else {
+        console.log("No arbi found")
+    }
+
+    // const listingA = await GET.getOSTokenIdSellQuote("0xedf6d3c3664606fe9ee3a9796d5cc75e3b16e682", 4165)
+    // await fs.promises.writeFile(`./listingA.json`, JSON.stringify(listingA, null, 2), (errr) => {
+    //     if (errr) {console.log(errr);}
+    // });
+    // const A = require('./listingA.json')
+    // console.log(createOSTxData(A))
 
     // create bundle 
     // send bundle 
