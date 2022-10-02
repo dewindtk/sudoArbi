@@ -4,14 +4,14 @@ const Web3 = require(`web3`)
 require("dotenv").config();
 const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 const ethers = require('ethers')
+const MEM = require('./updatePools.js')
 const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 
 
 //Only normal listings for now
 //Checks payment_token.address == 0x, price devided by payment_token.decimals, is_private == false
 //BEFORE: returns {"token_id": [{market, price, expiration timestamp, listingObject}]}
-
-//NOW: returns [{token_id, market, price, expiration, listing_object}]
+//NOW: returns [{market, token_id, price, expiration, object}]
 async function getOsEvents(contract, delta){
     const options = {
         method: 'GET',
@@ -29,15 +29,30 @@ async function getOsEvents(contract, delta){
     for (obj of listings){
         iprice = parseFloat(web3.utils.fromWei(obj.starting_price))
         iexp = Math.round(new Date(`${obj.listing_time}z`).valueOf()/1000 + parseInt(obj.duration))
-        result.push({"token_id": obj.asset.token_id, "market": "OS", "price": iprice, "expiration": iexp,"object": obj})
+        result.push({"market": "OS", "token_id": obj.asset.token_id, "price": iprice, "expiration": iexp,"object": obj})
+    }
+    return result
+}
+
+function concatListingsNoDuplicate(arr1, arr2){
+    let result = (arr1.length>arr2.length)? arr1: arr2
+    for (item of (arr1.length>arr2.length)? arr2:arr1){
+        if (typeof result.find(obj => obj.object.id === item.object.id) == 'undefined'){
+            result.push(item)
+        }
     }
     return result
 }
 
 //Removes inactive listings
-function updateListings(listings){
+async function updateListings(listings){
     dateNow = Math.round(new Date(new Date().toISOString()).valueOf()/1000)
     console.log("datenow: ", dateNow)
+    let cnfg = await MEM.readConfig()
+    for (bl in cnfg.blackList){
+        listings = listings.filter(obj => obj.object.asset.id != bl)
+        console.log("This listing is in the Blacklist", bl)
+    }
     return listings.filter(obj => obj.expiration > dateNow)
 }
 
@@ -77,21 +92,20 @@ async function getPoolSellQuote(pairContract){
     return {"pairContract": pairContract, "balance": balance, "outputAmount": outputAmount, "newSpotPrice": newSpotPrice, "newBalance": newBalance}
 }
 
-async function getPoolsQuotes(){
+async function getPoolsQuotes(collection){
     const pools = require('./pools.json') //error handling
     let myPools = []
-    try{
-        myPools = pools["0xed5af388653567af2f388e6224dc7c4b3241c544"]
-    }
-    catch(err){
+    if (!(collection in pools)){
         console.log("No pools for this contract");
-        return []
+        return null
     }
+    myPools = pools[collection]
     let prmses = []
     for (const pool of myPools){
         prmses.push(getPoolSellQuote(pool))
     }
     result = await Promise.allSettled(prmses)
+    // console.log("potential error HERE: ", result)
     result2 = result.map(function(obj){
         return obj.value
     })
@@ -133,4 +147,5 @@ module.exports = {
     updateListings,
     getPoolsQuotes,
     getOSTokenIdSellQuote,
+    concatListingsNoDuplicate,
 }

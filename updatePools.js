@@ -3,23 +3,21 @@ const Web3 = require(`web3`)
 require("dotenv").config();
 const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 
-//Create & update pool info 
-// think: seperat efunction to fetch events and to create pools?
-//Maybe event file which is not yet in pools data? Buffer
+//Create & update pool.json 
 async function updatePools(){
     let cnfg = await readConfig();
     let blockNow = await web3.eth.getBlockNumber();
     let events = [];
     let txs = []
+    let merged
 
     console.log("Updating pools.");
     console.log("Last saved Block is: ", cnfg.lastBlock);
     console.log("Now downloading remaining blocks (if any) until: ", blockNow);
 
     do{ //Fetch events, fetch txs, rename, merge, save into pools those merged.
-        //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event.
-        
-        //TODO Make fetchTxs and Events return lastBlock and compare lastBlock to BlockNow, will eliminate last call.
+        //Have to fetch both Txs and Events as nft contract info only in tx and pool contract info only in event. 
+        //TODO Make fetchTxs and Events return lastBlock and compare lastBlock to BlockNow, will eliminate last call. <--??? do not remember what was meant here
         txs = await fetchTxsBtw(parseInt(cnfg.lastBlock)+1, blockNow)
         events = await fetchEventsBtw(parseInt(cnfg.lastBlock)+1, blockNow)
         if(events.length != 0){
@@ -123,16 +121,10 @@ async function savePools(pools){
     });
 }
 
-async function main(){ //example
-    await updatePools(); // await once in case the update is big, such as the first time
-    setInterval(()=>updatePools(), 60000) //Update pool info every min. (make adjustable through cnfg)
-    //Arbinext
-}
-
-// main();
-
 module.exports = {
     updatePools,
+    updateConfig,
+    readConfig,
 }
 
 

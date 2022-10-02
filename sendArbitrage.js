@@ -8,6 +8,8 @@ const { FlashbotsBundleProvider } = require("@flashbots/ethers-provider-bundle")
 const MEM = require('./updatePools.js')
 const GET = require('./getListings.js')
 const toHex = web3.utils.toHex
+const args = require('args-parser')(process.argv) //Expect "collection", "gas"
+const readline = require("readline");
 
 function completeLeft(str){
     console.log(str)
@@ -113,17 +115,32 @@ function createSudoTxData(inputData){//require Object {minExpectedOutputAmount, 
 }
 
 //returns [listed tokenID, pool addy] if found, else null
-async function findProfitableListing(listings, pools){
+async function findProfitableListing(listings, pools, args){
     pools = pools.sort((a,b) => -(a.outputAmount-b.outputAmount))
     listings = listings.sort((a,b) => (a.price-b.price))
+
+    //TODO: args.gas. For this, Gas usage must be known. This is specific to Collection.
+    //Simulation would be required.
+
     if (pools[0].outputAmount > listings[0].price){
+        console.log("FOUND ARBI!!!!!!!!!!!!!!")
+        console.log("Listing: ", listings[0], "Pool: ", pools[0])
+        console.log(listings[0].object.asset.asset_contract.address, listings[0].token_id)
         const osSellQuote = await GET.getOSTokenIdSellQuote(listings[0].object.asset.asset_contract.address, listings[0].token_id)
+        console.log("OSSELLQUOTE HERE: ", osSellQuote)
+        if (osSellQuote.orders.length == 0){
+            console.log("Too bad, this Item has already been sniped. Adding listing ID to blacklist.")
+            await addCnfgBlacklist(listings[0].object.asset.id)
+            return null
+        }
+
         return [osSellQuote, pools[0]] //return OsSellquote here, keep in mind multiple listings, orders[0]
     }
+    console.log("Arbi not found.\n")
     return null
 }
 
-async function createFBBundle(osTxData, parameters, poolAddy, sudoTxData, marketplace='OS'){
+async function createBundle(osTxData, parameters, poolAddy, sudoTxData, marketplace='OS'){
     const authSigner = new ethers.Wallet(`${process.env.FB_AUTH_KEY}`);
     const wallet3 = new ethers.Wallet(`${process.env.WALLET_PRIV_KEY}`)
     const nonce3 = web3.eth.getTransactionCount(wallet3.address)
@@ -186,44 +203,119 @@ async function createFBBundle(osTxData, parameters, poolAddy, sudoTxData, market
     return signedBundle
 }
  
-async function sendFBBundle(signedBundle){
+async function sendBundle(signedBundle){
+    //Thx Kfish otherdeeds this is good copipe material
+    const simulation = await flashbotsProvider.simulate(signedTransactions, targetBlock)
+    if ('error' in simulation) {
+      console.warn(`Simulation Error: ${simulation.error.message}`)
+      process.exit(1)
+    } else {
+      console.log(`Simulation Success: ${JSON.stringify(simulation, null, 2)}`)
+    }
+
     const bundleReceipt = await flashbotsProvider.sendRawBundle(
         signedBundle,
         TARGET_BLOCK_NUMBER
     );
-    return bundleReceipt
+    console.log('bundle submitted, waiting')
+    if ('error' in bundleSubmission) {
+      throw new Error(bundleSubmission.error.message)
+    }
+    const waitResponse = await bundleSubmission.wait()
+    console.log(`Wait Response: ${FlashbotsBundleResolution[waitResponse]}`)
+}
+
+async function addCnfgBlacklist(id){
+    let cnfg = await MEM.readConfig()
+    if (!("blackList" in cnfg)){
+        cnfg.blackList = []
+    }
+    cnfg.blackList.push(id)
+    await MEM.updateConfig(cnfg)
 }
 
 
-
+//"0xed5af388653567af2f388e6224dc7c4b3241c544"
 async function main(){
 
-    await MEM.updatePools(); // await once in case the update is big, such as the first time
-    // setInterval(()=>MEM.updatePools(), 180000) //Update pool info every min. (make adjustable through cnfg)
+    //TODO Think about: If using Setinterval, when inspecting listings already in memory and this is changed, what to do?
+    //      ---->> Set ratio fetch/findArbi? Ask KFish.
+    //TODO Error handling on every fetch pls
+
+    //Save args in config for reusage
+    let cnfg = await MEM.readConfig()
+    for (arg of Object.keys(args)){
+        cnfg.args[arg] = args[arg]
+    }
+    cnfg.blackList = []
+    await MEM.updateConfig(cnfg)
+
+    //Args parser
+    if (!("collection" in args)){
+        console.log("ERROR: Collection not specified")
+        return;
+    }
+    cnfg.args.collection = args.collection
+    //Default gas 15 prio & max
+    cnfg.args.gas = ("gas" in args)? args.gas : ("gas" in cnfg.args)? cnfg.args.gas : "15" //Gwei
+    //Default loop interval 10sec
+    cnfg.args.listloop = ("listloop" in args)? parseInt(args.listloop) : ("listloop" in cnfg.args)? cnfg.args.listloop : 0 //Milisecs  //TODO
+    //Default listing fetch delta 1h
+    cnfg.args.listdelta = ("listdelta" in args)? parseInt(args.listdelta) : ("listdelta" in cnfg.args)? cnfg.args.listdelta : 3600//Seconds //TODO
+
+    const rl = readline.createInterface({input: process.stdin,output: process.stdout,});
+    const question1 = () => {
+        return new Promise((resolve, reject) => {
+            rl.question("PLEASE CONFIRM ARGS", function (answer) {
+                if (!(answer === 'y' || answer === 'yes' || answer === '')){process.exit(1)}
+                resolve()
+            });
+        })
+    }
+    //Ask before executing. 
+    // console.log("PLEASE CONFIRM ARGS:")
+    // console.log("Collection: ", cnfg.args.collection)
+    // console.log("Fetching max 20 listings from ", cnfg.args.listdelta, " seconds ago (set high if low volume, low if high volume)")
+    // console.log("Time interval for looping listing fetch: ", cnfg.args.listloop)// Not used yet, defaulted to 0
+    // console.log("Gas in GWEI for txs, Prio AND Max: ", cnfg.args.gas)
+    console.log("args: ", cnfg.args)
+    await question1()
+    rl.close
 
     let listings = []
-    let osListings = await GET.getOsEvents("0xed5af388653567af2f388e6224dc7c4b3241c544", 72000)
-    listings = listings.concat(osListings)
-    listings = GET.updateListings(listings)
-    console.log("listing Events: ", listings) //[{token_id, market, price, expiration, listing_object},{},{}]
-    //loop this upadte
+    let osListings = []
+    // await MEM.updatePools(); // await once in case the update is big, such as the first time
 
-    pools = await GET.getPoolsQuotes("0xed5af388653567af2f388e6224dc7c4b3241c544") //[{addy, balance, outputAmount, newSpotPrice, newBalance},{},{}]
-    console.log("final pools: ", pools)
+    while(true){
+        arbi = null
+        console.log("\nLooking for new arbi...")
+        while (arbi === null){
+            await MEM.updatePools();
 
-    arbi = await findProfitableListing(listings, pools); //TODO //returns WListing, WPool
+            console.log("\nFetching OS listing Events")
+            osListings = await GET.getOsEvents(cnfg.args.collection, cnfg.args.listdelta)
+            console.log("Updating listings in Memory")
+            listings = GET.concatListingsNoDuplicate(listings, osListings)
+            listings = await GET.updateListings(listings) //[{market, token_id, price, expiration, object}]
 
-    if (arbi !== null){
-        const osTxData = createOSTxData()
-        const sudoTxData = createSudoTxData()
-        const signedBundle = await createFBBundle(osTxData, arbi[0], sudoTxData, arbi[1])
-        // const txReceipt = await sendFBBundle(signedBundle)
+            console.log("\nFetching collection pools Quotes")//Takes forever //Takes really forever
+    //----> TODO A LOOOOTTT REJECTED. Proper error handling pls. Or faster Node or wateva
+            pools = await GET.getPoolsQuotes(cnfg.args.collection) //[{addy, balance, outputAmount, newSpotPrice, newBalance},{},{}]
+            if (pools == null){continue}
+            // console.log("listing Events: ", listings) //[{market, token_id, price, expiration, listing_object},{},{}]
+            // console.log("final pools: ", pools)
+
+            console.log("\nChecking for arbi opportunity")
+            arbi = await findProfitableListing(listings, pools, cnfg.args) //TODO: Include gas in calculation.
+        }
+    
+        const osTxData = createOSTxData(arbi[0])
+        const sudoTxData = createSudoTxData(arbi[1])
+        const signedBundle = await createBundle(osTxData, arbi[0], sudoTxData, arbi[1], gas)
+        const txReceipt = await sendBundle(signedBundle)
         console.log(txReceipt)
     }
-    else {
-        console.log("No arbi found")
-    }
-
+    
     // const listingA = await GET.getOSTokenIdSellQuote("0xedf6d3c3664606fe9ee3a9796d5cc75e3b16e682", 4165)
     // await fs.promises.writeFile(`./listingA.json`, JSON.stringify(listingA, null, 2), (errr) => {
     //     if (errr) {console.log(errr);}
