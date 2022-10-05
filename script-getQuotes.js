@@ -4,7 +4,7 @@ const Web3 = require(`web3`)
 require("dotenv").config();
 const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 const ethers = require('ethers')
-const MEM = require('./updatePools.js')
+const MEM = require('./script-updateLocalPools.js')
 const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 
 //Fetches Opensea listing Events for our target collection, since delta seconds ago.
@@ -104,7 +104,7 @@ async function getPoolSellQuote(pairContract){
 //@param NFT collection address
 //@return Array of custom pool Object of form {addy, balance, outputAmount, newSpotPrice, newBalance}, sorted by price and not empty 
 async function getPoolsQuotes(collection){
-    const pools = require('./pools.json') //error handling
+    const pools = require('./DATA-pools.json') //error handling
     let myPools = []
     if (!(collection in pools)){
         console.log("No pools for this contract");

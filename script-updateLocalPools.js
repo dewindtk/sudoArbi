@@ -32,12 +32,12 @@ async function updatePools(){
 //@return cnfg.json, if there is none will be created. Last Block inspected saved in cnfg.
 async function readConfig(){ 
     try{    
-        let cnfg = require(`./cnfg.json`);
+        let cnfg = require(`./DATA-cnfg.json`);
         return cnfg;
     } catch (err){
         console.log("No cnfg file found, creating fresh one");
         cnfg = {"lastBlock": 0};
-        await fs.promises.writeFile(`./cnfg.json`, JSON.stringify(cnfg), (errr) => {
+        await fs.promises.writeFile(`./DATA-cnfg.json`, JSON.stringify(cnfg), (errr) => {
         if (errr) {console.log(errr);}
         });
         return cnfg;
@@ -47,7 +47,7 @@ async function readConfig(){
 //@param cnfg json
 //Updates cnfg.json
 async function updateConfig(cnfg){ 
-    await fs.promises.writeFile(`./cnfg.json`, JSON.stringify(cnfg), (errr) => {
+    await fs.promises.writeFile(`./DATA-cnfg.json`, JSON.stringify(cnfg), (errr) => {
         if (errr) {console.log(errr);}
     });
 }
@@ -98,11 +98,11 @@ async function fetchEventsBtw(blockA, blockB){
 async function mergeTxsEvents(txs, events){
     let pools;
     try{    
-        pools = require(`./pools.json`);
+        pools = require(`./DATA-pools.json`);
     } catch (err){
         console.log("No pools file found, creating fresh one");
         pools = {};
-        await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools), (errr) => {
+        await fs.promises.writeFile(`./DATA-pools.json`, JSON.stringify(pools), (errr) => {
         if (errr) {console.log(errr);}
         });
     }
@@ -125,7 +125,7 @@ async function mergeTxsEvents(txs, events){
 //Save pools into file
 //@param pools json
 async function savePools(pools){
-    await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools, null, 2), (errr) => {
+    await fs.promises.writeFile(`./DATA-pools.json`, JSON.stringify(pools, null, 2), (errr) => {
         if (errr) {console.log(errr);}
     });
 }
