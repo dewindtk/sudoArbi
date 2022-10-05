@@ -4,12 +4,12 @@ const MEM = require('./updatePools.js')
 const GET = require('./getListings.js')
 const readline = require("readline");
 const ethers = require('ethers')
-const toHex = web3.utils.toHex
 const Web3 = require(`web3`)
 require("dotenv").config();
 const fs = require('fs')
 const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
+const toHex = web3.utils.toHex
 
 //@param string, length less than 64
 //@return string, appended 64-len 0's to the left
