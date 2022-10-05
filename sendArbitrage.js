@@ -235,7 +235,6 @@ async function addCnfgBlacklist(id){
 }
 
 
-//"0xed5af388653567af2f388e6224dc7c4b3241c544"
 async function main(){
 
     //TODO Think about: If using Setinterval, when inspecting listings already in memory and this is changed, what to do?
@@ -251,11 +250,11 @@ async function main(){
     await MEM.updateConfig(cnfg)
 
     //Args parser
-    if (!("collection" in args)){
+    if (!("collection" in args || "collection" in cnfg.args)){
         console.log("ERROR: Collection not specified")
         return;
     }
-    cnfg.args.collection = args.collection
+    cnfg.args.collection = ("collection" in args)? args.collection : cnfg.args.collection
     //Default gas 15 prio & max
     cnfg.args.gas = ("gas" in args)? args.gas : ("gas" in cnfg.args)? cnfg.args.gas : "15" //Gwei
     //Default loop interval 10sec
@@ -272,12 +271,6 @@ async function main(){
             });
         })
     }
-    //Ask before executing. 
-    // console.log("PLEASE CONFIRM ARGS:")
-    // console.log("Collection: ", cnfg.args.collection)
-    // console.log("Fetching max 20 listings from ", cnfg.args.listdelta, " seconds ago (set high if low volume, low if high volume)")
-    // console.log("Time interval for looping listing fetch: ", cnfg.args.listloop)// Not used yet, defaulted to 0
-    // console.log("Gas in GWEI for txs, Prio AND Max: ", cnfg.args.gas)
     console.log("args: ", cnfg.args)
     await question1()
     rl.close
