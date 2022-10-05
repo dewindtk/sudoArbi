@@ -7,11 +7,11 @@ const ethers = require('ethers')
 const MEM = require('./updatePools.js')
 const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 
-
-//Only normal listings for now
-//Checks payment_token.address == 0x, price devided by payment_token.decimals, is_private == false
-//BEFORE: returns {"token_id": [{market, price, expiration timestamp, listingObject}]}
-//NOW: returns [{market, token_id, price, expiration, object}]
+//Fetches Opensea listing Events for our target collection, since delta seconds ago.
+//Only normal listings for now (no private, no weird ERC20 considerations, etc.)
+//@param collection contract address
+//@param seconds in the past
+//@return array of custom listing object [{market, token_id, price, expiration, object}]
 async function getOsEvents(contract, delta){
     const options = {
         method: 'GET',
@@ -34,6 +34,8 @@ async function getOsEvents(contract, delta){
     return result
 }
 
+//@param two arrays of custom listing objects of form [{market, token_id, price, expiration, object}]
+//@return array without listing duplicates.
 function concatListingsNoDuplicate(arr1, arr2){
     let result = (arr1.length>arr2.length)? arr1: arr2
     for (item of (arr1.length>arr2.length)? arr2:arr1){
@@ -45,6 +47,8 @@ function concatListingsNoDuplicate(arr1, arr2){
 }
 
 //Removes inactive listings
+//@param array of custom listing Objects of form [{market, token_id, price, expiration, object}]
+//@return array of custom listing Objects without expired listings
 async function updateListings(listings){
     dateNow = Math.round(new Date(new Date().toISOString()).valueOf()/1000)
     console.log("datenow: ", dateNow)
@@ -56,6 +60,9 @@ async function updateListings(listings){
     return listings.filter(obj => obj.expiration > dateNow)
 }
 
+//@param collection contract address
+//@param tokenID 
+//@return Opensea V2 listing Object with incremently sorted 'orders' array.
 async function getOSTokenIdSellQuote(contract, tokenId){
     const options = {
         method: 'GET',
@@ -68,8 +75,9 @@ async function getOSTokenIdSellQuote(contract, tokenId){
     return responce;
 }
 
-// Too many web3 Calls. Slow. TODO make utils calculations yourself.
-// returns addy, balance, outputAmount, newSpotPrice, newBalance
+//TODO COMMENT: VERY SLOW. Optimize
+//@param contract address of LSSVMPair
+//@returns {addy, balance, outputAmount, newSpotPrice, newBalance}
 async function getPoolSellQuote(pairContract){
     const abi = ["function getSellNFTQuote(uint256) external view returns (string, uint256, uint256, uint256, uint256)"]
     const contract = new ethers.Contract(pairContract, abi, ethProvider)
@@ -92,6 +100,9 @@ async function getPoolSellQuote(pairContract){
     return {"pairContract": pairContract, "balance": balance, "outputAmount": outputAmount, "newSpotPrice": newSpotPrice, "newBalance": newBalance}
 }
 
+//TODO: COMMENT: LOTS OF POOLS FECTHED WITH ERROR. FIX OR OPTIMIZE
+//@param NFT collection address
+//@return Array of custom pool Object of form {addy, balance, outputAmount, newSpotPrice, newBalance}, sorted by price and not empty 
 async function getPoolsQuotes(collection){
     const pools = require('./pools.json') //error handling
     let myPools = []
@@ -114,7 +125,8 @@ async function getPoolsQuotes(collection){
 }
 
 //Filters out inactive pools (maybe save in seperate monitor array) and then sort by profitability
-//Input: [{addy, balance, outputAmount, newSpotPrice, newBalance}]
+//@param array of custom pools objects [{addy, balance, outputAmount, newSpotPrice, newBalance}]
+//@return Array of custom pool Object of form {addy, balance, outputAmount, newSpotPrice, newBalance}, sorted by price and not empty 
 function filterEmptyPoolsSort(pools){
     pools = pools.filter(obj => (typeof obj)!=='undefined')
     pools = pools.filter(obj => obj.newBalance > 0)//Think of proper error handling of UNDEFINED ASK KFISH
@@ -123,23 +135,7 @@ function filterEmptyPoolsSort(pools){
 }
 
 //Add multiple collection support tho this outside current functions
-// async function main(){
 
-//     let listings = {}
-//     let osListings = await getOsEvents("0xed5af388653567af2f388e6224dc7c4b3241c544", 36000)
-//     listings = addToListings(listings, [osListings])
-//     console.log("final: ", listings)
-//     //loop this upadte
-
-//     pools = await getPoolsQuotes("0xed5af388653567af2f388e6224dc7c4b3241c544")
-//     console.log(pools)
-
-//     //Loop updateListings
-// }
-// main();
-
-//TODO draw plan of action into same steps for both pools and listings for better org
-//TODO make arrays disctionaries for organization
 
 
 module.exports = {

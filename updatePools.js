@@ -29,7 +29,7 @@ async function updatePools(){
     } while(events.length > 0)
 }
 
-//returns cnfg.json, if there is none will be created. Last Block inspected saved in cnfg.
+//@return cnfg.json, if there is none will be created. Last Block inspected saved in cnfg.
 async function readConfig(){ 
     try{    
         let cnfg = require(`./cnfg.json`);
@@ -44,6 +44,7 @@ async function readConfig(){
     }
 }
 
+//@param cnfg json
 //Updates cnfg.json
 async function updateConfig(cnfg){ 
     await fs.promises.writeFile(`./cnfg.json`, JSON.stringify(cnfg), (errr) => {
@@ -52,6 +53,8 @@ async function updateConfig(cnfg){
 }
 
 //returns txs of the sudo pairFactory contract btw blockA and blockB, max of 10000
+//@param blocks, any
+//@return txs Object from API call
 async function fetchTxsBtw(blockA, blockB){
     url = `https://api.etherscan.io/api?module=account&action=txlist&address=0xb16c1342e617a5b6e4b631eb114483fdb289c0a4&startblock=${blockA}&endblock=${blockB}&page=1&offset=10000&sort=asc&apikey=${process.env.ETHERSCANAPIKEY}`;
     response = await fetch(url);
@@ -71,6 +74,8 @@ async function fetchTxsBtw(blockA, blockB){
 }
 
 //returns events of createPair btw blockA and blockB, max of 10000
+//@param blocks, any
+//@return events Object from API call
 async function fetchEventsBtw(blockA, blockB){
     url = `https://api.etherscan.io/api?module=logs&action=getLogs&fromBlock=${blockA}&toBlock=${blockB}&topic0=0xf5bdc103c3e68a20d5f97d2d46792d3fdddfa4efeb6761f8141e6a7b936ca66c&page=1&offset=10000&apikey=${process.env.ETHERSCANAPIKEY}`;
     response = await fetch(url);
@@ -86,7 +91,10 @@ async function fetchEventsBtw(blockA, blockB){
     return events;
 }
 
-// returns [pools, lastBlock saved] 
+//Merged txs and pools into pools.json
+//@param txs object
+//@param events object
+//@return [pools.json, lastBlock saved] 
 async function mergeTxsEvents(txs, events){
     let pools;
     try{    
@@ -115,6 +123,7 @@ async function mergeTxsEvents(txs, events){
 }
 
 //Save pools into file
+//@param pools json
 async function savePools(pools){
     await fs.promises.writeFile(`./pools.json`, JSON.stringify(pools, null, 2), (errr) => {
         if (errr) {console.log(errr);}

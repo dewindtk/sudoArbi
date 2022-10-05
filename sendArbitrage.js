@@ -1,26 +1,30 @@
-const fs = require('fs')
-const ethers = require('ethers')
-const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
-const Web3 = require(`web3`)
-require("dotenv").config();
-const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 const { FlashbotsBundleProvider } = require("@flashbots/ethers-provider-bundle");
+const args = require('args-parser')(process.argv) //Expect "collection", "gas"
 const MEM = require('./updatePools.js')
 const GET = require('./getListings.js')
-const toHex = web3.utils.toHex
-const args = require('args-parser')(process.argv) //Expect "collection", "gas"
 const readline = require("readline");
+const ethers = require('ethers')
+const toHex = web3.utils.toHex
+const Web3 = require(`web3`)
+require("dotenv").config();
+const fs = require('fs')
+const ethProvider = new ethers.providers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
+const web3 = new Web3(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`);
 
+//@param string, length less than 64
+//@return string, appended 64-len 0's to the left
 function completeLeft(str){
-    console.log(str)
+    if (typeof str !== 'string'){throw 'conpleteLeft: ', str, 'is not a string'}
     str = str.replace('0x', '')
+    if (str.length > 64){throw 'comepleteLeft: ', str, 'is already bigger than 64 chars long'}
     while(str.length < 64){
         str = `0${str}`
     }
-    console.log(str.length)
     return str.toLowerCase()
 }
 
+//@param string
+//@return string, appended 0's to the right so length multiple of 64
 function complete64(str){
     str = str.replace('0x', '')
     const toLen = Math.ceil(str.length/64)
@@ -32,6 +36,9 @@ function complete64(str){
     return str.toLowerCase()
 }
 
+//@param listing in seaPortV2 'orders' object
+//@return 'txData': raw hex transaction input data string
+//@return 'parameters' paramaters object used for input data
 function createOSTxData(listing){
     let basicOrderParameters = {
         "considerationToken": '0x',
@@ -90,17 +97,9 @@ function createOSTxData(listing){
         "parameters": basicOrderParameters};
 }
 
-/*
-    offset = ...000a0
-    uint256 minexpectedOutput
-    address recipient
-    bool ...00000
-    address ...00000
-    Size of TokenIDs (in this case 0001)
-    uint256 tokenid
- */
-
-function createSudoTxData(inputData){//require Object {minExpectedOutputAmount, recipient, tokenId}
+//@param Object: {minExpectedOutputAmount, recipient, tokenId}
+//@return raw hex tx Data string for sudoswap selling off sudoSwap pool
+function createSudoTxData(inputData){
     //swapNFTsForToken(uint256[],uint256,address,bool,address)
     let txData = '0xb1d3f1c1'
         + `${completeLeft('a0')}`
@@ -114,7 +113,10 @@ function createSudoTxData(inputData){//require Object {minExpectedOutputAmount, 
     return txData
 }
 
-//returns [listed tokenID, pool addy] if found, else null
+//@param Array of V1 listing objects in form: {market, token_id, price, expiration, object}
+//@param Array of pool objects in form: {addy, balance, outputAmount, newSpotPrice, newBalance}
+//@param process args
+//returns [OS V2 listing object, pool addy] if found, else null
 async function findProfitableListing(listings, pools, args){
     pools = pools.sort((a,b) => -(a.outputAmount-b.outputAmount))
     listings = listings.sort((a,b) => (a.price-b.price))
@@ -140,6 +142,12 @@ async function findProfitableListing(listings, pools, args){
     return null
 }
 
+//@param raw tx data for sniping off OS
+//@param OS basicorderParameters
+//@param address of sudo pool
+//@param raw tx data for selling off LSSVMPair
+//@param marketplace, 'OS', 'LR', 'XY'
+//@return signed Flashbots Bundle
 async function createBundle(osTxData, parameters, poolAddy, sudoTxData, marketplace='OS'){
     const authSigner = new ethers.Wallet(`${process.env.FB_AUTH_KEY}`);
     const wallet3 = new ethers.Wallet(`${process.env.WALLET_PRIV_KEY}`)
@@ -302,7 +310,7 @@ async function main(){
             arbi = await findProfitableListing(listings, pools, cnfg.args) //TODO: Include gas in calculation.
         }
     
-        const osTxData = createOSTxData(arbi[0])
+        const osTxData = createOSTxData(arbi[0]).txData
         const sudoTxData = createSudoTxData(arbi[1])
         const signedBundle = await createBundle(osTxData, arbi[0], sudoTxData, arbi[1], gas)
         const txReceipt = await sendBundle(signedBundle)
