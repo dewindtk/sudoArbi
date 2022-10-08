@@ -1,7 +1,7 @@
 const { FlashbotsBundleProvider } = require("@flashbots/ethers-provider-bundle");
 const args = require('args-parser')(process.argv) //Expect "collection", "gas"
-const MEM = require('./updatePools.js')
-const GET = require('./getListings.js')
+const MEM = require('./script-updateLocalPools.js')
+const GET = require('./script-getQuotes.js')
 const readline = require("readline");
 const ethers = require('ethers')
 const Web3 = require(`web3`)
@@ -121,10 +121,15 @@ async function findProfitableListing(listings, pools, args){
     pools = pools.sort((a,b) => -(a.outputAmount-b.outputAmount))
     listings = listings.sort((a,b) => (a.price-b.price))
 
+    if (pools.length == 0){
+        console.log("No pools with liq for this collection")
+        return null
+    }
+
     //TODO: args.gas. For this, Gas usage must be known. This is specific to Collection.
     //Simulation would be required.
 
-    if (pools[0].outputAmount > listings[0].price){
+    if (pools[0].outputAmount > listings[0].price){ //+ transferEstimate
         console.log("FOUND ARBI!!!!!!!!!!!!!!")
         console.log("Listing: ", listings[0], "Pool: ", pools[0])
         console.log(listings[0].object.asset.asset_contract.address, listings[0].token_id)
@@ -255,7 +260,6 @@ async function main(){
         cnfg.args[arg] = args[arg]
     }
     cnfg.blackList = []
-    await MEM.updateConfig(cnfg)
 
     //Args parser
     if (!("collection" in args || "collection" in cnfg.args)){
@@ -283,6 +287,7 @@ async function main(){
     await question1()
     rl.close
 
+    await MEM.updateConfig(cnfg)
     let listings = []
     let osListings = []
     // await MEM.updatePools(); // await once in case the update is big, such as the first time
@@ -315,6 +320,7 @@ async function main(){
         const signedBundle = await createBundle(osTxData, arbi[0], sudoTxData, arbi[1], gas)
         const txReceipt = await sendBundle(signedBundle)
         console.log(txReceipt)
+        return
     }
     
     // const listingA = await GET.getOSTokenIdSellQuote("0xedf6d3c3664606fe9ee3a9796d5cc75e3b16e682", 4165)

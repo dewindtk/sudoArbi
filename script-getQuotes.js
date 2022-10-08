@@ -81,7 +81,9 @@ async function getOSTokenIdSellQuote(contract, tokenId){
 async function getPoolSellQuote(pairContract){
     const abi = ["function getSellNFTQuote(uint256) external view returns (string, uint256, uint256, uint256, uint256)"]
     const contract = new ethers.Contract(pairContract, abi, ethProvider)
+    
     const result = await contract.getSellNFTQuote(1); //error, newSpotPrice, newDelta, outputAmount, protocolFee
+    console.log(result)
 
     let balance = await web3.eth.getBalance(pairContract)
     balance = web3.utils.fromWei(balance)
